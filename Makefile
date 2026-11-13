@@ -8,9 +8,13 @@ ucm := $(DESTDIR)/usr/share/alsa/ucm2
 
 all: obj/$(card)-tplg.bin
 
-obj/$(card).conf: topology/$(card).m4
+obj/audioreach/tokens.m4: topology/audioreach-topology/audioreach/tokens.m4
+	mkdir -p obj/audioreach
+	sed '/AR_TKN_U32_MODULE_FRAME_SYNC_RATE/a `	AR_TKN_U32_MODULE_FMT_NUM_CHANNELS "277"'"'"'' $< > $@
+
+obj/$(card).conf: topology/$(card).m4 obj/audioreach/tokens.m4 $(wildcard topology/galaxyxr/*.m4)
 	mkdir -p obj
-	$(M4) -I topology/audioreach-topology $< > $@
+	$(M4) -I obj -I topology -I topology/audioreach-topology $< > $@
 
 obj/$(card)-tplg.bin: obj/$(card).conf
 	$(ALSATPLG) -c $< -o $@

@@ -3,7 +3,10 @@
 The Galaxy XR's sound card setup for mainline kernels: the files the
 kernel and PipeWire need for the speakers, the microphones and
 DisplayPort audio. The 5.10 kernel takes another road, Qualcomm's
-userspace stack (`gxr-audio`).
+userspace stack (`gxr-audio`). Both can be installed together: all of
+this is tied to the mainline kernel's sound card (`SamsungGalaxyXR`)
+and does nothing under 5.10, and `gxr-audio` starts only where the
+vendor kernel's audio device exists.
 
 | Installed file | Role |
 |---|---|
@@ -21,12 +24,23 @@ The macros in `topology/audioreach-topology` come from
 
 | PCM | Stream | Backend |
 |---|---|---|
-| 0 | MultiMedia1, playback | Speakers: I2S on LPAIF_RXTX primary, data line SD1 |
+| 0 | MultiMedia1, playback | Speakers: TDM on LPAIF_RXTX primary, four slots of 32 bits, through Samsung's speaker processing |
 | 1 | MultiMedia2, playback | DisplayPort |
 | 2 | MultiMedia3, capture | Microphones through the VA macro |
 
 All streams are 48 kHz, 16 bit, stereo. Samsung's ADSP firmware takes
 the container type of newer AudioReach (`110000` in the stream macros).
+
+The speaker link carries 24 bit in four channels, one slot per
+amplifier: woofer left, woofer right, tweeter left, tweeter right. In
+front of it sits Samsung's speaker processing, a module built into its
+ADSP firmware (0x10001f01): it splits the stereo stream between woofers
+and tweeters near 2.4 kHz and compresses it, as on Android. The module
+works only as Samsung runs it: behind an MFC that makes 24 bit and the
+channels FL FR LB RB, in a specialized container of a low-power
+subgraph, with its one parameter set. The macros for this are in
+`topology/galaxyxr`; the kernel side (the older TDM sink, the MFC's
+fixed format, the parameter) is on the `galaxy-xr-audio` branch.
 
 ## UCM profile
 
@@ -36,8 +50,8 @@ the container type of newer AudioReach (`110000` in the stream macros).
 | DisplayPort | 1 | Follows the `DP0 Jack` control |
 | Mic | 2 | Digital microphones 0 and 1, +16 dB |
 
-The left amplifiers play slot 0 of the I2S frame and the right ones slot
-1, so a woofer and its tweeter get the same signal.
+Each amplifier plays its own TDM slot, which the kernel sets from the
+link's slot mask.
 
 ## Speaker protection
 
