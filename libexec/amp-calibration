@@ -1,0 +1,122 @@
+#!/bin/sh
+# Gives the protection firmware of the four speaker amplifiers this unit's factory
+# calibration: each speaker's resistance and the temperature it was measured at, and the
+# trims of the amplifier's voltage and current sense. Samsung's factory left them in
+# sec_efs/cirrus as decimal text; its 5.10 driver takes them from Android's audio HAL.
+# The firmware takes the resistance when it starts, so the amplifier's DSP is stopped,
+# given the values and started again; the kernel keeps them for later starts. The first
+# start is there for the firmware's controls, which the kernel makes when it loads the
+# firmware. The sense trims can be written only while the DSP runs and the amplifier is
+# awake, so the amplifier is kept from sleeping meanwhile.
+# The firmware reports what it took (CAL_SET_STATUS 2, CAL_R_SELECTED) once sound plays.
+# Without a factory file the resistance is the vendor device tree's default-redc of that
+# speaker type, at 23 degrees, as in the 5.10 driver.
+# "stop" unloads the firmware, for shutdown: alsactl stores the mixer after it, with
+# DSP1 Preload Switch off. A state stored with the firmware loaded would load it again
+# at the next boot and write the firmware's memory of that moment back into it.
+#
+#   amp-calibration [start|stop]
+set -u
+
+action=${1:-start}
+card=${GALAXYXR_SOUND_CARD:-SamsungGalaxyXR}
+efs=${GALAXYXR_AMP_CALIBRATION:-/run/platform/sec_efs/cirrus}
+amps='WooferL WooferR TweeterL TweeterR'
+
+say() {
+    echo "$*" >&2
+}
+
+numid() {
+    amixer -c "$card" controls | sed -n "s/^numid=\([0-9]*\),.*name='$1 DSP1 Protection $2'\$/\1/p" | head -n 1
+}
+
+words() {
+    for word; do
+        printf '0x%02x,0x%02x,0x%02x,0x%02x,' $((word >> 24 & 255)) $((word >> 16 & 255)) \
+            $((word >> 8 & 255)) $((word & 255))
+    done | sed 's/,$//'
+}
+
+put() {
+    id=$(numid "$1" "$2")
+    [ -n "$id" ] && amixer -q -c "$card" cset "numid=$id" "$(words "$3")"
+}
+
+factory() {
+    value=$(tr -d '\000\n' < "$efs/$1" 2> /dev/null) || return 1
+    case $value in
+        '' | *[!0-9]*) return 1 ;;
+    esac
+    echo "$value"
+}
+
+preload() {
+    amixer -q -c "$card" cset "name='$1 DSP1 Preload Switch'" "$2"
+}
+
+calibrate() {
+    amp=$1 address=$2 suffix=$3 default_rdc=$4
+
+    if [ -z "$(numid "$amp" 'cd CAL_R')" ]; then
+        preload "$amp" on || return 1
+        if [ -z "$(numid "$amp" 'cd CAL_R')" ]; then
+            say "$amp: no protection firmware"
+            return 1
+        fi
+    fi
+
+    if rdc=$(factory "rdc_cal$suffix") && [ "$rdc" -gt 0 ] && temp=$(factory temp_cal) && [ "$temp" -gt 0 ]; then
+        source=factory
+    else
+        rdc=$default_rdc temp=23 source=default
+    fi
+
+    for power in /sys/bus/i2c/drivers/cs35l45/*-00"$address"/power/control; do
+        [ -e "$power" ] && echo on > "$power"
+    done
+
+    result=0
+    preload "$amp" off
+    put "$amp" 'cd CAL_R' "$rdc" &&
+        put "$amp" 'cd CAL_AMBIENT' "$temp" &&
+        put "$amp" 'cd CAL_STATUS' 1 &&
+        put "$amp" 'cd CAL_CHECKSUM' $((rdc + 1)) || result=1
+    preload "$amp" on || result=1
+
+    trims=none
+    if [ "$source" = factory ] && vsc=$(factory "vsc_cal$suffix") && isc=$(factory "isc_cal$suffix") &&
+        [ "$vsc" -gt 0 ] && [ "$isc" -gt 0 ]; then
+        if put "$amp" 'f204 .*CAL_STATE' 2 && put "$amp" 'f204 VSC' "$vsc" && put "$amp" 'f204 ISC' "$isc"; then
+            trims="vsc $vsc isc $isc"
+        else
+            result=1
+        fi
+    fi
+
+    for power in /sys/bus/i2c/drivers/cs35l45/*-00"$address"/power/control; do
+        [ -e "$power" ] && echo auto > "$power"
+    done
+
+    say "$amp: $source rdc $rdc at $temp C, trims $trims$([ $result = 0 ] || echo ', not all written')"
+    return $result
+}
+
+if ! amixer -c "$card" cget "name='WooferL DSP1 Preload Switch'" > /dev/null 2>&1; then
+    say "$card: no speaker amplifiers"
+    exit 0
+fi
+
+if [ "$action" = stop ]; then
+    for amp in $amps; do
+        preload "$amp" off
+    done
+    exit 0
+fi
+
+failed=0
+calibrate WooferL 30 _b 6434 || failed=1
+calibrate WooferR 31 _br 6434 || failed=1
+calibrate TweeterL 32 '' 9511 || failed=1
+calibrate TweeterR 33 _r 9511 || failed=1
+exit $failed

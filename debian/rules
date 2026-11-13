@@ -1,0 +1,8 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+# The service's stop unloads the amplifiers' firmware: not in the middle of an upgrade
+override_dh_installsystemd:
+	dh_installsystemd --no-restart-after-upgrade --no-stop-on-upgrade

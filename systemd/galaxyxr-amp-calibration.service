@@ -1,0 +1,11 @@
+[Unit]
+Description=Galaxy XR speaker amplifiers' factory calibration for their protection firmware
+Documentation=file:///usr/share/doc/galaxyxr-audio/README.md
+# Stops before alsa-restore.service stores the mixer at shutdown
+After=run-platform-sec_efs.mount alsa-restore.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/galaxyxr-audio/amp-calibration start
+ExecStop=/usr/libexec/galaxyxr-audio/amp-calibration stop

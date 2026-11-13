@@ -1,0 +1,3 @@
+# The sound card of mainline kernels: calibrate its speaker amplifiers once its controls
+# are there and alsactl has restored them
+SUBSYSTEM=="sound", KERNEL=="controlC*", ATTRS{id}=="SamsungGalaxyXR", TAG+="systemd", ENV{SYSTEMD_WANTS}+="galaxyxr-amp-calibration.service"

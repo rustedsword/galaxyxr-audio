@@ -1,0 +1,20 @@
+Source: galaxyxr-audio
+Section: sound
+Priority: optional
+Maintainer: Stanislav Aleksandrov <lightofmysoul@gmail.com>
+Build-Depends: alsa-utils, debhelper-compat (= 13), m4
+Rules-Requires-Root: no
+Standards-Version: 4.7.4
+Homepage: https://github.com/rustedsword/galaxyxr-audio
+Vcs-Browser: https://github.com/rustedsword/galaxyxr-audio
+Vcs-Git: https://github.com/rustedsword/galaxyxr-audio.git
+
+Package: galaxyxr-audio
+Architecture: all
+Depends: alsa-ucm-conf, alsa-utils, ${misc:Depends}
+Recommends: galaxyxr-base-partitions, galaxyxr-firmware (>= 7~)
+Description: Galaxy XR sound card setup for mainline kernels
+ The AudioReach topology that the kernel loads for the Galaxy XR's sound
+ card, the ALSA UCM profile that tells PipeWire about its speakers,
+ microphones and DisplayPort audio, and a service that gives the speaker
+ amplifiers' protection firmware the unit's factory calibration.
