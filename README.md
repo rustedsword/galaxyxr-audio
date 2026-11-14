@@ -48,10 +48,24 @@ fixed format, the parameter) is on the `galaxy-xr-audio` branch.
 |---|---|---|
 | Speaker | 0 | Enables the four CS35L45 amplifiers |
 | DisplayPort | 1 | Follows the `DP0 Jack` control |
-| Mic | 2 | Digital microphones 0 and 1, +16 dB |
+| Mic | 2 | The inner pair of bottom microphones, left and right (DMIC1, DMIC3), +16 dB |
 
 Each amplifier plays its own TDM slot, which the kernel sets from the
 link's slot mask.
+
+The headset has six digital microphones on four data lines of the SoC:
+
+| Position | Input | Samsung's name |
+|---|---|---|
+| Bottom, far left (as worn) | DMIC0 | 5th mic |
+| Bottom, inner left | DMIC1 | main mic |
+| Bottom, inner right | DMIC3 | sub mic |
+| Bottom, far right | DMIC2 | 6th mic |
+| Outer left side | DMIC5 | 3rd mic |
+| Outer right side | DMIC7 | 4th mic |
+
+The profile records the pair of Samsung's stereo recording, unprocessed.
+DMIC4 and DMIC6 repeat DMIC5 and DMIC7.
 
 ## Speaker protection
 
